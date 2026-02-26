@@ -24,12 +24,19 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-### 3. Run the Application
+### 3. Troubleshooting GPU
+Jika GPU tidak terdeteksi (muncul pesan "CPU Mode" di aplikasi), jalankan script perbaikan otomatis:
+```powershell
+python fix_gpu.py
+```
+
+### 4. Run the Application
 Start the FastAPI server:
 ```powershell
 python app.py
 ```
 Open your browser and visit: `http://localhost:7860`
+
 
 ### 📥 Automatic Model Download
 **Note:** When you run the application for the first time, it will automatically download approximately **3-5 GB** of AI models from Hugging Face:
