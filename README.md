@@ -6,13 +6,13 @@ A powerful web-based image generation application built with **FastAPI** and **S
 - **Photorealistic Output**: Uses Realistic Vision v5.1 for stunning clarity and detail.
 - **Image-to-Image + IP-Adapter**: Transform existing photos while keeping the original facial identity.
 - **Auto Quality Boost**: Built-in prompt engineering for professional-grade results.
-- **VRAM Optimized**: Runs efficiently even on lower-end GPUs (e.g. RTX 3050 4GB).
+- **CPU Optimized**: Runs purely on CPU, making it compatible with any Windows, Mac, or Linux computer without needing an NVIDIA graphic card.
 - **History Tracking**: Automatically keeps track of your last 20 generated images.
 
 ## 🚀 Getting Started
 
 ### 1. Prerequisites
-Make sure you have **Python 3.10+** and **Git** installed. An NVIDIA GPU with at least 4GB of VRAM is highly recommended.
+Make sure you have **Python 3.10+** and **Git** installed. A multi-core processor and at least 8GB of RAM are recommended since this app runs entirely on the CPU.
 
 ### 2. Installation
 Clone the repository and install the dependencies:
@@ -24,13 +24,7 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-### 3. Troubleshooting GPU
-Jika GPU tidak terdeteksi (muncul pesan "CPU Mode" di aplikasi), jalankan script perbaikan otomatis:
-```powershell
-python fix_gpu.py
-```
-
-### 4. Run the Application
+### 3. Run the Application
 Start the FastAPI server:
 ```powershell
 python app.py

@@ -35,9 +35,8 @@ from diffusers import (
 # ---------------------------------------------------------------------------
 # Global performance flags
 # ---------------------------------------------------------------------------
-torch.backends.cudnn.benchmark = True          # faster convolutions
-torch.backends.cuda.matmul.allow_tf32 = True   # faster matmul on Ampere+
-torch.backends.cudnn.allow_tf32 = True
+# (GPU flags removed for CPU-only version)
+
 
 BASE_MODEL_ID = "SG161222/Realistic_Vision_V5.1_noVAE"
 VAE_MODEL_ID = "stabilityai/sd-vae-ft-mse"
@@ -74,16 +73,12 @@ QUALITY_NEGATIVE_SUFFIX = (
 
 def get_device():
     """Return the best available device."""
-    if torch.cuda.is_available():
-        return "cuda"
     return "cpu"
 
 
 def get_dtype(device: str):
     """Return optimal dtype for device."""
-    if device == "cuda":
-        return torch.float16
-    return torch.float32
+    return torch.float32  # CPU only supports float32 for these operations
 
 
 class PipelineManager:
@@ -107,10 +102,7 @@ class PipelineManager:
 
     @staticmethod
     def _detect_low_vram() -> bool:
-        if torch.cuda.is_available():
-            vram_gb = torch.cuda.get_device_properties(0).total_memory / 1024**3
-            return vram_gb < PipelineManager.LOW_VRAM_THRESHOLD
-        return False
+        return False  # Not relevant for CPU
 
     # ------------------------------------------------------------------
     # Lazy loaders
@@ -335,10 +327,6 @@ class PipelineManager:
 
         try:
             # Clear VRAM before generation to maximize available memory
-            if self.device == "cuda":
-                gc.collect()
-                torch.cuda.empty_cache()
-
             t0 = time.time()
 
             # Use inference_mode for faster execution (no grad tracking)
@@ -403,11 +391,6 @@ class PipelineManager:
                 # Upscale the image first using Lanczos
                 image_upscaled = image.resize((new_w, new_h), PILImage.LANCZOS)
 
-                # Run img2img refinement pass
-                if self.device == "cuda":
-                    gc.collect()
-                    torch.cuda.empty_cache()
-
                 generator2 = torch.Generator(device=self.device).manual_seed(seed)
                 pipe_i2i = self._get_img2img_pipeline()
                 self._set_scheduler(pipe_i2i, sampler)
@@ -448,17 +431,8 @@ class PipelineManager:
 
             return image, seed
 
-        except torch.cuda.OutOfMemoryError:
-            # Clear VRAM and report
-            gc.collect()
-            torch.cuda.empty_cache()
-            raise RuntimeError(
-                "VRAM tidak cukup! Coba kurangi resolusi atau sampling steps, atau matikan Hi-Res Fix."
-            )
         except Exception as e:
             gc.collect()
-            if self.device == "cuda":
-                torch.cuda.empty_cache()
             raise RuntimeError(f"Error saat generate: {str(e)}")
 
     # ------------------------------------------------------------------
@@ -467,14 +441,9 @@ class PipelineManager:
 
     def get_status(self) -> dict:
         """Return current device / model status."""
-        gpu_name = None
-        vram = None
-        if torch.cuda.is_available():
-            gpu_name = torch.cuda.get_device_name(0)
-            vram = f"{torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB"
         return {
-            "device": self.device,
-            "gpu": gpu_name,
-            "vram": vram,
+            "device": "cpu",
+            "gpu": None,
+            "vram": None,
             "dtype": str(self.dtype),
         }
