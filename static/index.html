@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Studio — Generate & Transform</title>
+    <meta name="description"
+        content="Transform and generate images with AI. Upload a reference photo and describe what you want.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- ==================== HEADER ==================== -->
+    <header class="app-header">
+        <div class="header-left">
+            <h1 class="logo">
+                <span class="logo-icon">◆</span>
+                Image Studio
+            </h1>
+            <span class="version-badge">img2img</span>
+        </div>
+        <div class="header-right">
+            <div class="gpu-status" id="gpuStatus">
+                <span class="status-dot"></span>
+                <span class="status-text">Detecting GPU...</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==================== MAIN LAYOUT ==================== -->
+    <main class="app-main">
+
+        <!-- LEFT PANEL — Prompt & Settings -->
+        <aside class="panel panel-left">
+            <div class="panel-inner">
+
+                <!-- Prompt Section -->
+                <section class="section">
+                    <h2 class="section-title">Prompt</h2>
+                    <div class="form-group">
+                        <label for="prompt">Deskripsi gambar</label>
+                        <textarea id="prompt" rows="3"
+                            placeholder="Contoh: portrait photo of a farmer in rice field, facing camera, wearing straw hat, mountains background..."></textarea>
+                        <p class="setting-hint">💡 Tips wajah: Tambahkan <strong>portrait, facing camera, front view,
+                                looking at viewer</strong> agar wajah tetap terlihat.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="negativePrompt">Negative Prompt</label>
+                        <textarea id="negativePrompt" rows="2"
+                            placeholder="back view, from behind, turned away, blurry, low quality, suit, formal wear"></textarea>
+                        <p class="setting-hint">Masukkan elemen yang ingin dihindari dari gambar hasil.</p>
+                    </div>
+
+                </section>
+
+
+
+                <!-- Generation Settings -->
+                <section class="section">
+                    <h2 class="section-title">Pengaturan</h2>
+
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label for="width">Width</label>
+                            <div class="input-with-value">
+                                <input type="range" id="width" min="256" max="1024" step="64" value="512">
+                                <span class="range-value" id="widthVal">512</span>
+                            </div>
+                        </div>
+                        <div class="form-group half">
+                            <label for="height">Height</label>
+                            <div class="input-with-value">
+                                <input type="range" id="height" min="256" max="1024" step="64" value="512">
+                                <span class="range-value" id="heightVal">512</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="steps">Sampling Steps</label>
+                        <div class="input-with-value">
+                            <input type="range" id="steps" min="1" max="80" step="1" value="25">
+                            <span class="range-value" id="stepsVal">25</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cfgScale">CFG Scale</label>
+                        <div class="input-with-value">
+                            <input type="range" id="cfgScale" min="1" max="30" step="0.5" value="7.5">
+                            <span class="range-value" id="cfgScaleVal">7.5</span>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label for="seed">Seed</label>
+                            <div class="seed-input-group">
+                                <input type="number" id="seed" value="-1" min="-1">
+                                <button type="button" class="btn-icon" id="randomSeed" title="Random Seed">↻</button>
+                            </div>
+                        </div>
+                        <div class="form-group half">
+                            <label for="sampler">Sampler</label>
+                            <select id="sampler">
+                                <option value="euler">Euler</option>
+                                <option value="dpm++" selected>DPM++</option>
+                                <option value="ddim">DDIM (rekomendasi untuk wajah)</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Image-to-Image Strength -->
+                <section class="section" id="strengthSection">
+                    <h2 class="section-title">Img2Img</h2>
+
+                    <div class="form-group">
+                        <label for="strength">Denoising Strength</label>
+                        <div class="input-with-value">
+                            <input type="range" id="strength" min="0.1" max="1.0" step="0.05" value="0.55">
+                            <span class="range-value" id="strengthVal">0.55</span>
+                        </div>
+                        <p class="setting-hint">🔹 0.40–0.60 = wajah mirip asli (rekomendasi untuk potret)<br>
+                            🔸 0.65–0.80 = perubahan sedang (pakaian berubah, wajah masih mirip)<br>
+                            🔺 0.85–1.00 = perubahan total (wajah bisa berubah)</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="faceStrength">Face Preservation 👤</label>
+                        <div class="input-with-value">
+                            <input type="range" id="faceStrength" min="0.0" max="1.0" step="0.05" value="0.6">
+                            <span class="range-value" id="faceStrengthVal">0.6</span>
+                        </div>
+                        <p class="setting-hint">Mengontrol seberapa kuat wajah dari foto referensi
+                            dipertahankan.<br>
+                            0.4–0.6 = rekomendasi · 0.0 = nonaktif · 1.0 = maksimal</p>
+                    </div>
+                </section>
+
+                <!-- Quality Enhancement Settings -->
+                <section class="section">
+                    <h2 class="section-title">Kualitas</h2>
+
+                    <div class="form-group">
+                        <label class="toggle-label-row">
+                            Quality Boost
+                            <label class="toggle-switch" for="qualityBoost">
+                                <input type="checkbox" id="qualityBoost" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
+                        <p class="setting-hint">Otomatis menambahkan tag kualitas (RAW photo, high quality, dsb.)
+                        </p>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="toggle-label-row">
+                            Hi-Res Fix
+                            <label class="toggle-switch" for="hiresFix">
+                                <input type="checkbox" id="hiresFix">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
+                        <p class="setting-hint">Upscale + refinement untuk detail lebih tajam</p>
+                    </div>
+
+                    <div class="hires-settings" id="hiresSettings">
+                        <div class="form-group">
+                            <label for="hiresScale">Upscale Factor</label>
+                            <div class="input-with-value">
+                                <input type="range" id="hiresScale" min="1.25" max="2.0" step="0.25" value="1.5">
+                                <span class="range-value" id="hiresScaleVal">1.5x</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="hiresStrength">Denoise Strength</label>
+                            <div class="input-with-value">
+                                <input type="range" id="hiresStrength" min="0.1" max="0.8" step="0.05" value="0.45">
+                                <span class="range-value" id="hiresStrengthVal">0.45</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+
+
+            </div>
+        </aside>
+
+        <!-- CENTER — Image Upload + Output -->
+        <div class="panel panel-center">
+            <div class="panel-inner">
+
+                <!-- Upload Area -->
+                <section class="section" id="uploadSection">
+                    <h2 class="section-title">
+                        Gambar Referensi
+                        <span class="badge badge-optional" id="imgOptionalBadge">Opsional</span>
+                    </h2>
+                    <p class="section-subtitle">Upload gambar referensi untuk mode img2img, atau kosongkan untuk
+                        text-to-image.</p>
+                    <div class="upload-zone" id="uploadZone">
+                        <input type="file" id="imageInput" accept="image/jpeg,image/png" hidden>
+                        <div class="upload-placeholder" id="uploadPlaceholder">
+                            <div class="upload-icon">
+                                <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.2"
+                                    viewBox="0 0 24 24">
+                                    <path d="M12 16V4m0 0l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+                                </svg>
+                            </div>
+                            <p class="upload-text">Drop file di sini atau <span class="upload-link">pilih file</span>
+                            </p>
+                            <p class="upload-hint">JPG / PNG · Maks 5 MB</p>
+                        </div>
+                        <div class="upload-preview" id="uploadPreview" style="display:none;">
+                            <img id="previewImg" alt="Preview">
+                            <button type="button" class="btn-remove" id="removeImage" title="Hapus gambar">✕</button>
+                        </div>
+                    </div>
+                    <!-- Camera Capture Button -->
+                    <button type="button" class="btn-camera" id="openCameraBtn">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5"
+                            viewBox="0 0 24 24">
+                            <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                            <circle cx="12" cy="13" r="4" />
+                        </svg>
+                        <span>Buka Kamera</span>
+                    </button>
+                </section>
+
+                <!-- Camera Modal -->
+                <div class="camera-modal-overlay" id="cameraModal" style="display:none;">
+                    <div class="camera-modal">
+                        <div class="camera-modal-header">
+                            <h3 class="camera-modal-title">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5"
+                                    viewBox="0 0 24 24">
+                                    <path
+                                        d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                                    <circle cx="12" cy="13" r="4" />
+                                </svg>
+                                Ambil Foto
+                            </h3>
+                            <button type="button" class="camera-close-btn" id="closeCameraBtn" title="Tutup">✕</button>
+                        </div>
+                        <div class="camera-viewport">
+                            <video id="cameraVideo" autoplay playsinline></video>
+                            <canvas id="cameraCanvas" style="display:none;"></canvas>
+                            <div class="camera-no-access" id="cameraNoAccess" style="display:none;">
+                                <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.2"
+                                    viewBox="0 0 24 24">
+                                    <path
+                                        d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                                </svg>
+                                <p>Akses kamera ditolak atau tidak tersedia</p>
+                                <p class="camera-hint">Izinkan akses kamera di pengaturan browser</p>
+                            </div>
+                        </div>
+                        <div class="camera-controls">
+                            <button type="button" class="camera-btn camera-btn-switch" id="switchCameraBtn"
+                                title="Ganti Kamera">
+                                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"
+                                    viewBox="0 0 24 24">
+                                    <path d="M16 3h5v5M4 20L21 3M8 21H3v-5m18 5L4 4" />
+                                </svg>
+                            </button>
+                            <button type="button" class="camera-btn camera-btn-capture" id="captureBtn"
+                                title="Ambil Foto">
+                                <div class="capture-ring"></div>
+                            </button>
+                            <button type="button" class="camera-btn camera-btn-cancel" id="cancelCameraBtn"
+                                title="Batal">
+                                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"
+                                    viewBox="0 0 24 24">
+                                    <path d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mode Indicator -->
+                <div class="mode-indicator" id="modeIndicator">
+                    <div class="mode-chip active" id="modeText2Img">
+                        <span class="mode-dot"></span>
+                        Text-to-Image
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button type="button" class="btn-generate" id="generateBtn">
+                    <span class="btn-text">Generate</span>
+                    <div class="btn-loading" style="display:none;">
+                        <div class="spinner"></div>
+                        <span>Memproses…</span>
+                    </div>
+                </button>
+
+                <!-- Output Area -->
+                <section class="section" id="outputSection" style="display:none;">
+                    <h2 class="section-title">
+                        Hasil
+                        <div class="output-actions">
+                            <button type="button" class="btn-small" id="downloadBtn">Download</button>
+                            <span class="seed-info" id="seedInfo"></span>
+                        </div>
+                    </h2>
+                    <div class="output-image-container">
+                        <img id="outputImg" alt="Generated Image">
+                    </div>
+                </section>
+
+                <!-- Error Display -->
+                <div class="error-banner" id="errorBanner" style="display:none;">
+                    <span class="error-icon">!</span>
+                    <span class="error-text" id="errorText"></span>
+                    <button type="button" class="error-close" id="errorClose">✕</button>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ==================== HISTORY GALLERY ==================== -->
+    <section class="history-section" id="historySection">
+        <h2 class="section-title">Riwayat</h2>
+        <div class="history-gallery" id="historyGallery">
+            <p class="history-empty" id="historyEmpty">Belum ada gambar yang dihasilkan.</p>
+        </div>
+    </section>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
