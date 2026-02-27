@@ -1,23 +1,3 @@
-"""
-Realistic Vision v5.1 — Image-to-Image Pipeline Manager with IP-Adapter Face.
-Handles lazy-loading and VRAM error handling.
-Optimized for low-VRAM GPUs (e.g. RTX 3050 4GB).
-
-Model: SG161222/Realistic_Vision_V5.1_noVAE
-VAE:   stabilityai/sd-vae-ft-mse (better color fidelity)
-Face:  h94/IP-Adapter (ip-adapter-plus-face_sd15) — preserves facial identity
-
-Modes:
-  - Text-to-Image: generate from prompt only
-  - Image-to-Image + Face Preservation: generate from prompt + reference image
-    Uses IP-Adapter Face to inject facial features into the generation.
-
-Quality enhancements:
-  - Auto quality-boost prompt tags for Realistic Vision
-  - Enhanced negative prompts
-  - Optional Hi-Res upscale via img2img refinement
-"""
-
 import gc
 import time
 import torch
@@ -35,9 +15,10 @@ from diffusers import (
 # ---------------------------------------------------------------------------
 # Global performance flags
 # ---------------------------------------------------------------------------
-# Force CUDA memory allocator to release memory more aggressively
 import os
-os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:128")
+# Force CUDA memory allocator to release memory more aggressively
+if torch.cuda.is_available():
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:128")
 
 
 BASE_MODEL_ID = "SG161222/Realistic_Vision_V5.1_noVAE"
@@ -74,17 +55,73 @@ QUALITY_NEGATIVE_SUFFIX = (
 
 
 def get_device():
-    """Return the best available device."""
+    """Return the best available device (NVIDIA, AMD, Intel, Apple, or CPU)."""
+    # Priority 1: NVIDIA GPU (CUDA) or AMD GPU (ROCm — also uses torch.cuda)
     if torch.cuda.is_available():
         return "cuda"
+    # Priority 2: Intel GPU (XPU)
+    if hasattr(torch, "xpu") and torch.xpu.is_available():
+        return "xpu"
+    # Priority 3: Apple Silicon GPU (MPS)
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return "mps"
+    # Priority 4: DirectML (AMD/Intel on Windows via torch-directml)
+    try:
+        import torch_directml
+        return torch_directml.device()
+    except ImportError:
+        pass
+    # Fallback: CPU
     return "cpu"
 
 
-def get_dtype(device: str):
-    """Return optimal dtype for device."""
-    if device == "cuda":
+def get_dtype(device):
+    """Return optimal dtype for the given device."""
+    device_str = str(device)
+    # Float16 is faster and uses less memory on GPUs
+    if device_str in ("cuda", "xpu") or "privateuseone" in device_str:
+        return torch.float16
+    if device_str == "mps":
         return torch.float16
     return torch.float32
+
+
+def _get_gpu_name(device) -> str:
+    """Return human-readable GPU name for any backend."""
+    device_str = str(device)
+    if device_str == "cuda":
+        return torch.cuda.get_device_name(0)
+    if device_str == "xpu":
+        return torch.xpu.get_device_name(0)
+    if device_str == "mps":
+        return "Apple Silicon (MPS)"
+    if "privateuseone" in device_str:
+        return "DirectML Device"
+    return "CPU"
+
+
+def _get_vram_gb(device) -> float:
+    """Return total VRAM in GB, or 0 if unknown."""
+    device_str = str(device)
+    try:
+        if device_str == "cuda":
+            return torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        if device_str == "xpu":
+            return torch.xpu.get_device_properties(0).total_memory / (1024**3)
+    except Exception:
+        pass
+    return 0
+
+
+def _clear_gpu_cache(device):
+    """Clear GPU memory cache for any backend."""
+    device_str = str(device)
+    if device_str == "cuda" and torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    elif device_str == "xpu" and hasattr(torch, "xpu"):
+        torch.xpu.empty_cache()
+    elif device_str == "mps" and hasattr(torch, "mps"):
+        torch.mps.empty_cache()
 
 
 class PipelineManager:
@@ -100,21 +137,18 @@ class PipelineManager:
         self._pipe_sd = None
         self._pipe_img2img = None
         self._image_encoder = None
-        # We'll set this to True once load_ip_adapter is called
         self._ip_adapter_loaded = False
         self._low_vram = self._detect_low_vram()
+        print(f"[Pipeline] Device: {self.device} | GPU: {_get_gpu_name(self.device)} | dtype: {self.dtype}")
         if self._low_vram:
             print(f"[Pipeline] Low-VRAM mode ENABLED (< {self.LOW_VRAM_THRESHOLD} GB)")
 
-    @staticmethod
-    def _detect_low_vram() -> bool:
-        if not torch.cuda.is_available():
+    def _detect_low_vram(self) -> bool:
+        vram_gb = _get_vram_gb(self.device)
+        if vram_gb == 0:
+            # Unknown VRAM (CPU, MPS, DirectML) — don't enable low-VRAM mode
             return False
-        try:
-            vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-            return vram_gb < PipelineManager.LOW_VRAM_THRESHOLD
-        except Exception:
-            return True
+        return vram_gb < self.LOW_VRAM_THRESHOLD
 
     # ------------------------------------------------------------------
     # Lazy loaders
@@ -128,7 +162,7 @@ class PipelineManager:
             pipe.enable_vae_tiling()
         if hasattr(pipe, 'enable_vae_slicing'):
             pipe.enable_vae_slicing()
-        if self.device == "cuda":
+        if str(self.device) != "cpu":
             try:
                 pipe.enable_xformers_memory_efficient_attention()
                 print("[Pipeline] xformers enabled ✓")
@@ -297,23 +331,6 @@ class PipelineManager:
         hires_scale: float = 1.5,
         hires_strength: float = 0.45,
     ):
-        """
-        Run the diffusion pipeline and return a PIL Image.
-
-        If reference_image is provided, runs img2img mode with IP-Adapter Face
-        to preserve facial identity from the reference image.
-
-        Params:
-          reference_image – PIL Image to use as starting point (img2img)
-          strength        – denoising strength (0.0 = no change, 1.0 = fully new)
-                            Lower = closer to original, Higher = more creative
-          face_strength   – IP-Adapter face influence (0.0 = ignore face, 1.0 = max)
-                            Controls how strongly the face from reference is preserved
-          quality_boost   – auto-prepend quality tags to prompt
-          hires_fix       – upscale image via img2img refinement pass
-          hires_scale     – how much to upscale (1.5x default)
-          hires_strength  – denoising strength for refine pass
-        """
         # For img2img: disable quality boost by default to let user prompt
         # take full effect (quality prefix can override clothing/scene changes)
         if reference_image is not None and quality_boost:
@@ -335,7 +352,9 @@ class PipelineManager:
         # Determine seed
         if seed < 0:
             seed = torch.randint(0, 2**32, (1,)).item()
-        generator = torch.Generator(device=self.device).manual_seed(seed)
+        # Some backends (MPS, DirectML) don't support Generator on device
+        gen_device = self.device if str(self.device) in ("cuda", "cpu") else "cpu"
+        generator = torch.Generator(device=gen_device).manual_seed(seed)
 
         try:
             # Clear VRAM before generation to maximize available memory
@@ -403,7 +422,7 @@ class PipelineManager:
                 # Upscale the image first using Lanczos
                 image_upscaled = image.resize((new_w, new_h), PILImage.LANCZOS)
 
-                generator2 = torch.Generator(device=self.device).manual_seed(seed)
+                generator2 = torch.Generator(device=gen_device).manual_seed(seed)
                 pipe_i2i = self._get_img2img_pipeline()
                 self._set_scheduler(pipe_i2i, sampler)
 
@@ -445,8 +464,7 @@ class PipelineManager:
 
         except Exception as e:
             gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            _clear_gpu_cache(self.device)
             raise RuntimeError(f"Error saat generate: {str(e)}")
 
     # ------------------------------------------------------------------
@@ -455,14 +473,13 @@ class PipelineManager:
 
     def get_status(self) -> dict:
         """Return current device / model status."""
+        device_str = str(self.device)
+        gpu_name = _get_gpu_name(self.device)
+        vram_gb = _get_vram_gb(self.device)
         info = {
-            "device": self.device,
-            "gpu": None,
-            "vram": None,
+            "device": device_str,
+            "gpu": gpu_name if device_str != "cpu" else None,
+            "vram": f"{vram_gb:.1f} GB" if vram_gb > 0 else None,
             "dtype": str(self.dtype),
         }
-        if torch.cuda.is_available():
-            info["gpu"] = torch.cuda.get_device_name(0)
-            vram = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-            info["vram"] = f"{vram:.1f} GB"
         return info

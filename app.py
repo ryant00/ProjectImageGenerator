@@ -1,14 +1,4 @@
-"""
-FastAPI server for Stable Diffusion Image-to-Image WebUI.
-Run: python app.py
-Visit: http://localhost:7860
-"""
-
 import os
-
-# ---------------------------------------------------------------------------
-# Redirect model cache to D: drive (avoid filling C: drive)
-# ---------------------------------------------------------------------------
 _CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models_cache")
 os.makedirs(_CACHE_DIR, exist_ok=True)
 os.environ["HF_HOME"] = _CACHE_DIR

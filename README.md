@@ -7,7 +7,12 @@ A powerful web-based image generation application built with **FastAPI** and **S
 - **Text-to-Image**: Generate images from text prompts only.
 - **Image-to-Image + IP-Adapter Face**: Transform existing photos while keeping the original facial identity.
 - **Auto Quality Boost**: Built-in prompt engineering for professional-grade results.
-- **GPU Accelerated (CUDA)**: Leverages NVIDIA GPU with CUDA 12.1 for fast generation. Supports low-VRAM GPUs (e.g. RTX 3050 4GB) with automatic memory optimizations.
+- **Multi-GPU Support**: Auto-detects and uses the best available GPU:
+  - 🟢 **NVIDIA** (CUDA) — Full support, fastest performance
+  - 🔴 **AMD** (ROCm on Linux / DirectML on Windows)
+  - 🔵 **Intel** (XPU / DirectML on Windows)
+  - 🍎 **Apple Silicon** (MPS on macOS)
+  - 🖥️ **CPU** — Fallback, works on any computer
 - **Hi-Res Fix**: Optional upscale via img2img refinement pass for higher resolution output.
 - **Multiple Schedulers**: Choose between Euler, DPM++, or DDIM samplers.
 - **History Tracking**: Automatically keeps track of your last 20 generated images.
@@ -17,8 +22,10 @@ A powerful web-based image generation application built with **FastAPI** and **S
 
 ### 1. Prerequisites
 - **Python 3.10+** and **Git** installed
-- **NVIDIA GPU** with CUDA support (recommended: 4GB+ VRAM)
-- **CUDA Toolkit 12.1** installed ([Download CUDA](https://developer.nvidia.com/cuda-12-1-0-download-archive))
+- **GPU** recommended for faster generation (NVIDIA, AMD, Intel, or Apple Silicon)
+  - NVIDIA users: Install **CUDA Toolkit 12.1** ([Download](https://developer.nvidia.com/cuda-12-1-0-download-archive))
+  - AMD users on Windows: Install `pip install torch-directml`
+  - Works on **CPU** too (just slower)
 
 ### 2. Installation
 Clone the repository and install the dependencies:
