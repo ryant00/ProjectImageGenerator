@@ -1,11 +1,10 @@
-# Untuk Pengguna Tanpa NVIDIA Driver (Intel/AMD/Mac)
-# File ini akan menginstal Torch versi CPU yang ukurannya jauh lebih kecil (~150MB) 
-# dibandingkan versi GPU (>2GB).
+# Untuk Pengguna dengan NVIDIA GPU (CUDA 12.1)
+# File ini akan menginstal Torch versi GPU untuk akselerasi CUDA.
 
---index-url https://download.pytorch.org/whl/cpu
+--index-url https://download.pytorch.org/whl/cu121
 
-torch==2.1.2+cpu
-torchvision==0.16.2+cpu
+torch==2.1.2+cu121
+torchvision==0.16.2+cu121
 
 diffusers==0.25.1
 transformers==4.36.2

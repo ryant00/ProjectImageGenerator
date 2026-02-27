@@ -101,18 +101,23 @@
     // Init
     // ====================
     function init() {
-        setupRangeSliders();
-        setupAdvancedToggle();
-        setupQualityToggles();
-        setupUpload();
-        setupCamera();
-        setupGenerate();
-        setupDownload();
-        setupErrorClose();
-        setupRandomSeed();
-        fetchGpuStatus();
-        fetchHistory();
-        updateModeIndicator();
+        const steps = [
+            setupRangeSliders,
+            setupAdvancedToggle,
+            setupQualityToggles,
+            setupUpload,
+            setupCamera,
+            setupGenerate,
+            setupDownload,
+            setupErrorClose,
+            setupRandomSeed,
+            fetchGpuStatus,
+            fetchHistory,
+            updateModeIndicator,
+        ];
+        steps.forEach((fn) => {
+            try { fn(); } catch (e) { console.warn('[init] ' + fn.name + ' failed:', e); }
+        });
     }
 
     // ====================
@@ -141,18 +146,17 @@
     // Mode Indicator
     // ====================
     function updateModeIndicator() {
+        if (!els.modeText2Img) return;
         if (uploadedFile) {
             els.modeText2Img.textContent = '';
             els.modeText2Img.innerHTML = '<span class="mode-dot img2img"></span> Image-to-Image';
             els.modeText2Img.classList.add('img2img-mode');
-            els.strengthSection.style.opacity = '1';
-            els.strengthSection.style.pointerEvents = 'auto';
+            if (els.strengthSection) { els.strengthSection.style.opacity = '1'; els.strengthSection.style.pointerEvents = 'auto'; }
         } else {
             els.modeText2Img.textContent = '';
             els.modeText2Img.innerHTML = '<span class="mode-dot"></span> Text-to-Image';
             els.modeText2Img.classList.remove('img2img-mode');
-            els.strengthSection.style.opacity = '0.5';
-            els.strengthSection.style.pointerEvents = 'none';
+            if (els.strengthSection) { els.strengthSection.style.opacity = '0.5'; els.strengthSection.style.pointerEvents = 'none'; }
         }
     }
 
@@ -160,6 +164,7 @@
     // Advanced Settings Toggle
     // ====================
     function setupAdvancedToggle() {
+        if (!els.advancedToggle || !els.advancedSettings) return;
         els.advancedToggle.addEventListener('click', () => {
             const isOpen = els.advancedSettings.style.display !== 'none';
             if (isOpen) {
@@ -176,6 +181,7 @@
     // Quality Toggles
     // ====================
     function setupQualityToggles() {
+        if (!els.hiresFix || !els.hiresSettings) return;
         // Hi-Res Fix toggle
         els.hiresFix.addEventListener('change', () => {
             if (els.hiresFix.checked) {
@@ -506,14 +512,18 @@
             const resp = await fetch('/api/status');
             const data = await resp.json();
 
+            // Remove default classes first
+            els.statusDot.classList.remove('cpu', 'active');
+
             if (data.device === 'cuda') {
                 els.statusDot.classList.add('active');
                 els.statusText.textContent = `${data.gpu} · ${data.vram}`;
             } else {
                 els.statusDot.classList.add('cpu');
-                els.statusText.textContent = 'CPU Mode (No CUDA)';
+                els.statusText.textContent = 'CPU Mode';
             }
         } catch {
+            els.statusDot.classList.remove('cpu', 'active');
             els.statusText.textContent = 'Server offline';
         }
     }

@@ -35,7 +35,9 @@ from diffusers import (
 # ---------------------------------------------------------------------------
 # Global performance flags
 # ---------------------------------------------------------------------------
-# (GPU flags removed for CPU-only version)
+# Force CUDA memory allocator to release memory more aggressively
+import os
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:128")
 
 
 BASE_MODEL_ID = "SG161222/Realistic_Vision_V5.1_noVAE"
@@ -73,12 +75,16 @@ QUALITY_NEGATIVE_SUFFIX = (
 
 def get_device():
     """Return the best available device."""
+    if torch.cuda.is_available():
+        return "cuda"
     return "cpu"
 
 
 def get_dtype(device: str):
     """Return optimal dtype for device."""
-    return torch.float32  # CPU only supports float32 for these operations
+    if device == "cuda":
+        return torch.float16
+    return torch.float32
 
 
 class PipelineManager:
@@ -102,7 +108,13 @@ class PipelineManager:
 
     @staticmethod
     def _detect_low_vram() -> bool:
-        return False  # Not relevant for CPU
+        if not torch.cuda.is_available():
+            return False
+        try:
+            vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            return vram_gb < PipelineManager.LOW_VRAM_THRESHOLD
+        except Exception:
+            return True
 
     # ------------------------------------------------------------------
     # Lazy loaders
@@ -433,6 +445,8 @@ class PipelineManager:
 
         except Exception as e:
             gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             raise RuntimeError(f"Error saat generate: {str(e)}")
 
     # ------------------------------------------------------------------
@@ -441,9 +455,14 @@ class PipelineManager:
 
     def get_status(self) -> dict:
         """Return current device / model status."""
-        return {
-            "device": "cpu",
+        info = {
+            "device": self.device,
             "gpu": None,
             "vram": None,
             "dtype": str(self.dtype),
         }
+        if torch.cuda.is_available():
+            info["gpu"] = torch.cuda.get_device_name(0)
+            vram = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            info["vram"] = f"{vram:.1f} GB"
+        return info
